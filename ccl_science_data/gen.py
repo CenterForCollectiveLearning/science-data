@@ -1,7 +1,7 @@
-
 class ComC:
     MAIN_NAME = "main"
     BUILD_LOC = "qc-builds"
+    SEM_DIR = "semantic-ids"
     A_STAT_PATH = "attribute-statics"
     QC_CONF = "qc-specs"
     ID_PREFIX = "https://openalex.org/"
@@ -32,6 +32,7 @@ class EntC:
 
 
 class AttC:
+    summary_stats = "summary_stats"
     ancestors = "ancestors"
     related_concepts = "related_concepts"
     associated_institution = "associated_institution"
@@ -44,11 +45,10 @@ class AttC:
 
 
 class Steps:
-    ENTITY_MAPPING = "entity_mapping"
-    INIT_ATTS = "init_atts"
+    ENTITY_MAPPING = "a1_entity_mapping"
+    INIT_ATTS = "a2_init_atts"
     DERIVE_LINKS1 = "derive_links1"
     DERIVE_LINKS2 = "derive_links2"
     DERIVE_LINKS3 = "derive_links3"
     DERIVE_LINKS4 = "derive_links4"
     DERIVE_LINKS5 = "derive_links5"
-

@@ -82,7 +82,7 @@ class GenReader:
         ss = 0
         names = []
         ftxt = (oa_root / f"a2_init_atts/{e}-names/targets").read_bytes()
-        for s in get_arr(f"a2_init_atts/{e}-names/sizes", sizet):
+        for s in map(int, get_arr(f"a2_init_atts/{e}-names/sizes", sizet)):
             names.append(ftxt[ss : (ss + s)].decode())
             ss = ss + s
         return names[:-1]

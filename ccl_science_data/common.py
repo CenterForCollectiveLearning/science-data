@@ -79,13 +79,7 @@ class GenReader:
 
     def get_names(self, e):
         sizet = 16 if e in [EntC.AUTHORS, EntC.SOURCES] else 8
-        ss = 0
-        names = []
-        ftxt = (oa_root / f"a2_init_atts/{e}-names/targets").read_bytes()
-        for s in map(int, get_arr(f"a2_init_atts/{e}-names/sizes", sizet)):
-            names.append(ftxt[ss : (ss + s)].decode())
-            ss = ss + s
-        return names[:-1]
+        return get_str_arr(f"a2_init_atts/{e}-names", sizet)
 
     def _get_counts(self, etype, i):
         ind = (etype, COUNT_SUFFS[i])
@@ -120,6 +114,16 @@ def get_gen_src(suff, gen_root="."):
 def get_arr(slug, dt):
     blob = (oa_root / slug).read_bytes()
     return np.frombuffer(blob, np_dtype(dt))
+
+
+def get_str_arr(slug: str, sizet: int):
+    ss = 0
+    names = []
+    ftxt = (oa_root / f"{slug}/targets").read_bytes()
+    for s in map(int, get_arr(f"{slug}/sizes", sizet)):
+        names.append(ftxt[ss : (ss + s)].decode())
+        ss = ss + s
+    return names[:-1]
 
 
 def np_dtype(n):

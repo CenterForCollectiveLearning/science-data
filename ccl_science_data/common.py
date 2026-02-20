@@ -2,7 +2,6 @@ import csv
 import gzip
 import json
 import re
-from functools import partial
 from pathlib import Path
 from typing import Iterable
 
@@ -32,7 +31,6 @@ A2_GEN = "a2_init_atts"
 COUNT_SUFFS = ["work-count", "cite-count"]
 
 # app_root = Path(os.environ["RANKLESS_APP_ROOT"]) / "src/lib/assets/data"
-oa_persistent = Path(os.environ["OA_PERSISTENT"])
 oa_root = Path(os.environ["OA_ROOT"])
 snap_dir = Path(os.environ["OA_SNAPSHOT"])
 
@@ -40,8 +38,6 @@ serve_path = oa_root / "pruned-cache"
 
 print("OA_ROOT: ", oa_root)
 print("SNAP_ROOT: ", snap_dir)
-
-ns_rex = re.compile('impl NamespacedEntity for (.*) { const NS: & str = "(.*)"; }')
 
 
 class Keys:
@@ -76,7 +72,6 @@ class GenReader:
         self.gen_txt = "\n\n".join(
             fp.read_text() for fp in Path(f"{gen_root}/rankless_rs/src/gen/").iterdir()
         )
-        self._add_read_funs()
 
     def get_wcounts(self, etype) -> np.ndarray:
         return self._get_counts(etype, 0)
@@ -84,8 +79,9 @@ class GenReader:
     def get_ccounts(self, etype) -> np.ndarray:
         return self._get_counts(etype, 1)
 
-    def get_names(self, e):
-        sizet = 16 if e in [EntC.AUTHORS, EntC.SOURCES] else 8
+    def get_names(self, e: str):
+        rex = rf"impl VariableSizeAttribute for {e.title()}Names {{ type SizeType = u(\d+); type LocType = .*; }}"
+        sizet = int(re.findall(rex, self.gen_txt)[0])
         return get_str_arr(f"a2_init_atts/{e}-names", sizet)
 
     def _get_counts(self, etype, i):
@@ -93,39 +89,6 @@ class GenReader:
         (dt, _, dl_name) = self.counts_df.loc[ind, :]
         dli = int(dl_name[-1])
         return get_dl_arr("-".join(ind), dli, dt[1:])
-
-    def _add_read_funs(self):
-        nsents = ns_rex.findall(self.gen_txt)
-        numents = []
-        arrents = []
-        sdtmap = {}
-        for en, ns in nsents:
-            numents += [
-                [*e, ns]
-                for e in re.findall(
-                    f'impl Entity for {en} {{ type T = u(\d+); const N: usize = \d+; const NAME: & str = "(.*)"; }}',
-                    self.gen_txt,
-                )
-            ]
-            for dtn, ename in re.findall(
-                f'impl Entity for {en} {{ type T = Box<\[u(\d+)\]>; const N: usize = \d+; const NAME: & str = "(.*)"; }}',
-                self.gen_txt,
-            ):
-                arrents.append([dtn, ename, ns])
-                sdtmap[ename] = re.findall(
-                    f"impl VariableSizeAttribute for {en} {{ type SizeType = u(\d+); type LocType = .*; }}",
-                    self.gen_txt,
-                )[0]
-
-        defs = ""
-        for dtn, en, ns in numents:
-            enr = en.replace("-", "_")
-            defs += f'self.load_arr_{enr} = partial(get_arr, "{ns}/{en}", {dtn})\n'
-        for dtn, en, ns in arrents:
-            enr = en.replace("-", "_")
-            defs += f'self.load_varr_{enr}_targets = partial(get_arr, "{ns}/{en}/targets", {dtn})\n'
-            defs += f'self.load_varr_{enr}_sizes = partial(get_arr, "{ns}/{en}/sizes", {sdtmap[en]})\n'
-        exec(defs)
 
 
 def get_flag_emoji(ccode: str):

@@ -11,7 +11,7 @@ from dotenv import find_dotenv, load_dotenv
 from pandas.compat import os
 from tqdm import tqdm
 
-from .gen import AttC, ComC, EntC, Steps, StowC
+from .gen import EntC, Steps, StowC
 
 print("loading ", find_dotenv())
 load_dotenv()
@@ -189,8 +189,8 @@ def read_full_df(ent: str, sub: str = MAIN_NAME, cols=None):
     return pd.concat(iter_dfs(ent, sub, cols=cols))
 
 
-def load_map(kind):
-    blob = Path(oa_root, Steps.ENTITY_MAPPING, kind).read_bytes()
+def load_map(kind, step=Steps.ENTITY_MAPPING):
+    blob = Path(oa_root, step, kind).read_bytes()
     imap = np.frombuffer(blob, dtype=np.dtype(np.uint64).newbyteorder(">")).reshape(
         -1, 2
     )

@@ -2,8 +2,10 @@ import csv
 import gzip
 import json
 import re
+from functools import partial
+from multiprocessing import Pool
 from pathlib import Path
-from typing import Iterable
+from typing import Any, Callable, Iterable
 
 import numpy as np
 import pandas as pd
@@ -232,6 +234,30 @@ def dump_filtered(
                 out_buf, index=False, header=first_one
             )
             first_one = False
+
+
+def _snap_file_worker(fn: Callable[[bytes], Any], jsf: Path) -> list:
+    results = []
+    with gzip.open(jsf) as gzp:
+        for gl in gzp:
+            r = fn(gl)
+            if r is not None:
+                results.append(r)
+    return results
+
+
+def parallel_map_snap_items(
+    e: str,
+    fn: Callable[[bytes], Any],
+    src_dir: Path = snap_dir,
+    workers: int | None = None,
+) -> list:
+    rdir = src_dir / "data" / e
+    jsfiles = [f for subd in rdir.iterdir() if subd.is_dir() for f in subd.iterdir()]
+    worker = partial(_snap_file_worker, fn)
+    with Pool(workers) as pool:
+        nested = list(tqdm(pool.imap_unordered(worker, jsfiles), total=len(jsfiles), desc=e))
+    return [item for sublist in nested for item in sublist]
 
 
 def iter_snap_items(e: str, src_dir=snap_dir):

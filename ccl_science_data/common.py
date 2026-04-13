@@ -1,5 +1,6 @@
 import csv
 import gzip
+import os
 import json
 import re
 from functools import partial
@@ -7,13 +8,13 @@ from multiprocessing import Pool
 from pathlib import Path
 from typing import Any, Callable, Iterable
 
+
 import numpy as np
 import pandas as pd
 from dotenv import find_dotenv, load_dotenv
-from pandas.compat import os
 from tqdm import tqdm
 
-from .gen import EntC, Steps, StowC
+from .gen import Steps, StowC
 
 print("loading ", find_dotenv())
 load_dotenv()
@@ -104,8 +105,18 @@ def get_root(entity):
     return oa_root / StowC.entity_csvs / entity
 
 
-def get_csv_path(entity: str, sub: str):
-    return get_root(entity) / f"{sub}.csv.gz"
+def get_csv_path(entity: str, sub: str) -> Path:
+    return get_root(entity) / f"{sub}.part-0000.csv.zst"
+
+
+def get_csv_parts(entity: str, sub: str) -> list[Path]:
+    root = get_root(entity)
+    prefix = f"{sub}.part-"
+    return sorted(
+        p
+        for p in root.iterdir()
+        if p.name.startswith(prefix) and p.name.endswith(".csv.zst")
+    )
 
 
 def get_gen_dl(n, gen_root="."):
@@ -183,8 +194,9 @@ def get_filtered_main_df(ent: str, cols=None) -> pd.DataFrame:
 def iter_dfs(
     ent: str, sub: str = MAIN_NAME, chunk: int = 1_000_000, cols=None
 ) -> Iterable[pd.DataFrame]:
-    for _df in pd.read_csv(get_csv_path(ent, sub), chunksize=chunk, usecols=cols):
-        yield _df
+    for part in get_csv_parts(ent, sub):
+        for _df in pd.read_csv(part, chunksize=chunk, usecols=cols, compression="zstd"):
+            yield _df
 
 
 def read_full_df(ent: str, sub: str = MAIN_NAME, cols=None):
@@ -215,27 +227,6 @@ def read_p(path: Path):
     return json.loads(gzip.decompress(path.read_bytes()))
 
 
-def dump_filtered(
-    out_dir: Path,
-    filter_set,
-    main=EntC.WORKS,
-    sub: str = MAIN_NAME,
-    ic=IDC,
-    cols=None,
-    id_parser=parse_id,
-):
-    first_one = True
-    out_path = out_dir / main / f"{sub}.csv.gz"
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_bytes(b"")
-    with gzip.open(out_path, "ab") as out_buf:
-        for _df in tqdm(iter_dfs(main, sub, cols=cols), desc=sub):
-            _df.loc[_df[ic].pipe(id_parser).isin(filter_set), :].to_csv(
-                out_buf, index=False, header=first_one
-            )
-            first_one = False
-
-
 def _snap_file_worker(fn: Callable[[bytes], Any], jsf: Path) -> list:
     results = []
     with gzip.open(jsf) as gzp:
@@ -256,7 +247,9 @@ def parallel_map_snap_items(
     jsfiles = [f for subd in rdir.iterdir() if subd.is_dir() for f in subd.iterdir()]
     worker = partial(_snap_file_worker, fn)
     with Pool(workers) as pool:
-        nested = list(tqdm(pool.imap_unordered(worker, jsfiles), total=len(jsfiles), desc=e))
+        nested = list(
+            tqdm(pool.imap_unordered(worker, jsfiles), total=len(jsfiles), desc=e)
+        )
     return [item for sublist in nested for item in sublist]
 
 

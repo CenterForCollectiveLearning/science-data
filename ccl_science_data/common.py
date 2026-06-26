@@ -83,7 +83,7 @@ class GenReader:
         return self._get_counts(etype, 1)
 
     def get_names(self, e: str):
-        rex = rf"impl VariableSizeAttribute for {e.title()}Names {{ type SizeType = u(\d+); type LocType = .*; }}"
+        rex = rf"impl VariableSizeAttribute for {e.title()}Names \{{\s*type SizeType = u(\d+);"
         sizet = int(re.findall(rex, self.gen_txt)[0])
         return get_str_arr(f"a2_init_atts/{e}-names", sizet)
 
@@ -168,7 +168,9 @@ def get_src_df(type_suffs, gen_files, gen_root="."):
 
 def get_rex(suff):
     return re.compile(
-        rf'impl Entity for .* {{ type T = (.*); const N: usize = (\d+); const NAME: & str = "(.*)\-{suff}"; }}'
+        rf"impl Entity for .+? \{{\s*type T = (.+?);\s*"
+        rf"const N: usize = (\d+);\s*"
+        rf'const NAME: &\s?str = "(.+?)\-{suff}";'
     )
 
 
